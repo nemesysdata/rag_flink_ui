@@ -128,14 +128,25 @@ class WebSocketSessionManager:
         session = self.get_session(session_id)
         if session and session.is_waiting_response:
             try:
-                await session.websocket.send_json({
+                message = {
                     'type': 'response',
                     'data': response
-                })
+                }
+                logger.info(f"[WEBSOCKET] Enviando mensagem para session_id={session_id}: {message}")
+                await session.websocket.send_json(message)
                 self.clear_waiting_response(session_id)
+                logger.info(f"[WEBSOCKET] Mensagem enviada com sucesso para session_id={session_id}")
                 return True
             except Exception as e:
-                logger.error(f"Error sending message to session {session_id}: {e}")
+                logger.error(f"[WEBSOCKET] Erro ao enviar mensagem para session_id={session_id}: {str(e)}")
+                logger.error(f"[WEBSOCKET] Tipo do erro: {type(e)}")
+                import traceback
+                logger.error(f"[WEBSOCKET] Traceback: {traceback.format_exc()}")
                 self.clear_waiting_response(session_id)
                 return False
+        else:
+            if not session:
+                logger.warning(f"[WEBSOCKET] Sessão não encontrada para session_id={session_id}")
+            elif not session.is_waiting_response:
+                logger.warning(f"[WEBSOCKET] Sessão {session_id} não está aguardando resposta")
         return False 

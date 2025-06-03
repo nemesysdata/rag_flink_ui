@@ -200,14 +200,16 @@ class KafkaResponseConsumer:
                 try:
                     # Deserialize message using Schema Registry
                     value = self.message_serializer.decode_message(message.value())
-                    logger.info(f"Received message from Kafka: {value}")
+                    session_id = value.get('session_id')
+                    logger.info(f"[KAFKA] Recebida resposta para session_id={session_id} no tópico {message.topic()}, partição {message.partition()}, offset {message.offset()}")
+                    logger.info(f"[KAFKA] Conteúdo da mensagem: {value}")
                     
                     # Process message
                     await self._process_message(value)
                     
                     # Commit offset after successful processing
                     self.consumer.commit(message)
-                    logger.info(f"Offset {message.offset()} committed successfully")
+                    logger.info(f"[KAFKA] Offset {message.offset()} commitado com sucesso para session_id={session_id}")
                     
                 except SerializerError as e:
                     logger.error(f"Message deserialization failed: {e}")
@@ -237,15 +239,15 @@ class KafkaResponseConsumer:
                 logger.error("Invalid message format: missing session_id or resposta")
                 return
             
-            logger.info(f"Processing message for session {session_id}: {resposta}")
+            logger.info(f"[WEBSOCKET] Tentando enviar resposta para session_id={session_id}")
             
             # Send response to WebSocket
             success = await self.websocket_manager.send_response(session_id, resposta)
             
             if not success:
-                logger.warning(f"Failed to send response to session {session_id}")
+                logger.warning(f"[WEBSOCKET] Falha ao enviar resposta para session_id={session_id}")
             else:
-                logger.info(f"Successfully sent response to session {session_id}")
+                logger.info(f"[WEBSOCKET] Resposta enviada com sucesso para session_id={session_id}")
                 
         except Exception as e:
             logger.error(f"Error processing message: {e}") 

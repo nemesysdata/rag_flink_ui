@@ -28,11 +28,14 @@ logger.info("Iniciando Streamlit frontend do RAG Flink UI...")
 
 def get_backend_url() -> str:
     """Get the backend URL from environment or use default."""
-    host = os.getenv("BACKEND_HOST", "localhost")
-    port = os.getenv("BACKEND_PORT", "8080")
-    url = f"ws://{host}:{port}"
-    logger.info(f"Backend URL configurado para: {url}")
-    return url
+    backend_url = os.getenv("BACKEND_URL", "ws://localhost:8080")
+    # Convert http/https to ws/wss
+    if backend_url.startswith("http://"):
+        backend_url = "ws://" + backend_url[7:]
+    elif backend_url.startswith("https://"):
+        backend_url = "wss://" + backend_url[8:]
+    logger.info(f"Backend URL configurado para: {backend_url}")
+    return backend_url
 
 async def connect_websocket():
     """Connect to the WebSocket server."""

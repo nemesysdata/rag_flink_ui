@@ -11,6 +11,7 @@ from confluent_kafka.avro.serializer import SerializerError
 from .websocket_manager import WebSocketSessionManager
 import os
 from concurrent.futures import ThreadPoolExecutor
+from confluent_kafka.avro.cached_schema_registry_client import CachedSchemaRegistryClient
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,17 @@ class KafkaResponseConsumer:
         self.running = False
         self.executor = ThreadPoolExecutor(max_workers=1)
         
+        # Schema Registry configuration
+        schema_registry_config = {
+            'url': schema_registry_url,
+            'basic.auth.credentials.source': 'USER_INFO',
+            'basic.auth.user.info': f"{os.getenv('SCHEMA_REGISTRY_API_KEY')}:{os.getenv('SCHEMA_REGISTRY_API_SECRET')}"
+        }
+        
+        # Initialize Schema Registry client
+        self.schema_registry_client = CachedSchemaRegistryClient(schema_registry_config)
+        logger.info(f"Initialized Schema Registry client with URL: {schema_registry_url}")
+        
         # Kafka consumer configuration
         self.config = {
             'bootstrap.servers': bootstrap_servers,
@@ -55,7 +67,9 @@ class KafkaResponseConsumer:
             'sasl.mechanisms': os.getenv('KAFKA_SASL_MECHANISM'),
             'sasl.username': os.getenv('KAFKA_API_KEY'),
             'sasl.password': os.getenv('KAFKA_API_SECRET'),
-            'client.id': 'rag-flink-ui-consumer'
+            'client.id': 'rag-flink-ui-consumer',
+            'schema.registry.basic.auth.credentials.source': 'USER_INFO',
+            'schema.registry.basic.auth.user.info': f"{os.getenv('SCHEMA_REGISTRY_API_KEY')}:{os.getenv('SCHEMA_REGISTRY_API_SECRET')}"
         }
         
         logger.info(f"Initializing Kafka consumer with config: {self.config}")
@@ -63,11 +77,20 @@ class KafkaResponseConsumer:
     async def start(self) -> None:
         """Start consuming messages from Kafka."""
         try:
+            # Test Schema Registry connection
+            try:
+                # Try to get a schema by ID 1 to test connection
+                self.schema_registry_client.get_by_id(1)
+                logger.info("Successfully connected to Schema Registry")
+            except Exception as e:
+                logger.error(f"Failed to connect to Schema Registry: {e}")
+                raise
+            
             self.consumer = AvroConsumer(self.config)
             self.consumer.subscribe(['respostas'])
             self.running = True
             
-            logger.info("Kafka consumer started")
+            logger.info("Kafka consumer started and subscribed to 'respostas' topic")
             await self._consume_messages()
             
         except Exception as e:
@@ -85,6 +108,7 @@ class KafkaResponseConsumer:
     
     async def _consume_messages(self) -> None:
         """Consume and process messages from Kafka."""
+        logger.info("Starting Kafka message consumption loop")
         while self.running:
             try:
                 # Run poll in a thread to avoid blocking the event loop
@@ -103,11 +127,31 @@ class KafkaResponseConsumer:
                         logger.error(f"Kafka error: {message.error()}")
                         continue
                 
+                try:
+                    # Try to get schema ID from message
+                    schema_id = message.headers().get('schema_id')
+                    if schema_id:
+                        logger.info(f"Message schema ID: {schema_id}")
+                        try:
+                            schema = self.schema_registry_client.get_by_id(schema_id)
+                            logger.info(f"Successfully retrieved schema for ID {schema_id}")
+                        except Exception as e:
+                            logger.error(f"Failed to get schema for ID {schema_id}: {e}")
+                except Exception as e:
+                    logger.error(f"Error getting schema ID from message: {e}")
+                
+                logger.info(f"Received message from Kafka: {message.value()}")
                 # Process message
                 await self._process_message(message.value())
                 
             except SerializerError as e:
                 logger.error(f"Message deserialization failed: {e}")
+                # Try to get more details about the error
+                try:
+                    if hasattr(e, 'message'):
+                        logger.error(f"Deserialization error details: {e.message}")
+                except Exception as detail_error:
+                    logger.error(f"Error getting deserialization details: {detail_error}")
                 continue
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
@@ -128,11 +172,15 @@ class KafkaResponseConsumer:
                 logger.error("Invalid message format: missing session_id or resposta")
                 return
             
+            logger.info(f"Processing message for session {session_id}: {resposta}")
+            
             # Send response to WebSocket
             success = await self.websocket_manager.send_response(session_id, resposta)
             
             if not success:
                 logger.warning(f"Failed to send response to session {session_id}")
+            else:
+                logger.info(f"Successfully sent response to session {session_id}")
                 
         except Exception as e:
             logger.error(f"Error processing message: {e}") 

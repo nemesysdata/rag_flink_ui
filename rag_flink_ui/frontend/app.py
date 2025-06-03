@@ -76,14 +76,14 @@ class WebSocketState:
                     
                     # Wait for response
                     logger.debug("[WEBSOCKET] Aguardando resposta...")
-                    response = await self.websocket.recv()
+                    response = await self.websocket.recv()                    
                     logger.info(f"[WEBSOCKET] Resposta recebida: {response}")
                     
                     # Update UI with response
                     response_data = json.loads(response)
                     self.messages.append({
                         "role": "assistant",
-                        "content": response_data["content"],
+                        "content": response_data["data"],
                         "confidence": response_data.get("confidence"),
                         "processing_time": response_data.get("processing_time")
                     })

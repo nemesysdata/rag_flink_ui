@@ -2,11 +2,22 @@
 Main FastAPI application for the RAG Flink UI backend.
 """
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+import streamlit as st
+import streamlit.web.bootstrap
+import streamlit.web.server.server
+import asyncio
 from typing import Dict, List
 import json
 from datetime import datetime
 from .mock_api import mock_service
+import os
+import sys
+from pathlib import Path
+from loguru import logger
 
 app = FastAPI(title="RAG Flink UI Backend")
 
@@ -29,6 +40,24 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Initialize Streamlit
+def init_streamlit():
+    """Initialize Streamlit in the background."""
+    sys.argv = ["streamlit", "run", str(Path(__file__).parent.parent / "frontend" / "app.py")]
+    streamlit.web.bootstrap.run(
+        str(Path(__file__).parent.parent / "frontend" / "app.py"),
+        "",
+        [],
+        flag_options={},
+    )
+
+@app.on_event("startup")
+async def startup_event():
+    """Start Streamlit in the background on startup."""
+    logger.info("FastAPI startup event: inicializando Streamlit em background...")
+    asyncio.create_task(asyncio.to_thread(init_streamlit))
+    logger.info("FastAPI está ouvindo e pronto para receber requisições.")
+
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for chat communication."""
@@ -48,4 +77,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 @app.get("/")
 async def root():
     """Root endpoint for health check."""
-    return {"status": "ok", "message": "RAG Flink UI Backend is running"} 
+    return {"status": "ok", "message": "RAG Flink UI Backend is running"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "ok", "message": "Service healthy"}
+
+# Mount Streamlit's static files
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent.parent / "frontend" / "static")), name="static") 

@@ -7,8 +7,10 @@ import uuid
 import json
 import websockets
 import asyncio
+import os
 from typing import Dict, List, Optional
 import time
+from loguru import logger
 
 # Initialize session state
 if "session_id" not in st.session_state:
@@ -22,14 +24,27 @@ if "websocket" not in st.session_state:
 if "is_connected" not in st.session_state:
     st.session_state.is_connected = False
 
+logger.info("Iniciando Streamlit frontend do RAG Flink UI...")
+
+def get_backend_url() -> str:
+    """Get the backend URL from environment or use default."""
+    host = os.getenv("BACKEND_HOST", "localhost")
+    port = os.getenv("BACKEND_PORT", "8080")
+    url = f"ws://{host}:{port}"
+    logger.info(f"Backend URL configurado para: {url}")
+    return url
+
 async def connect_websocket():
     """Connect to the WebSocket server."""
     try:
-        uri = f"ws://localhost:8000/ws/{st.session_state.session_id}"
+        uri = f"{get_backend_url()}/ws/{st.session_state.session_id}"
+        logger.info(f"Tentando conectar ao WebSocket: {uri}")
         st.session_state.websocket = await websockets.connect(uri)
         st.session_state.is_connected = True
+        logger.info("Conexão WebSocket estabelecida com sucesso.")
         return True
     except Exception as e:
+        logger.error(f"Falha ao conectar ao WebSocket: {str(e)}")
         st.error(f"Failed to connect to WebSocket server: {str(e)}")
         return False
 
@@ -45,10 +60,13 @@ async def send_message(message: str):
             "content": message,
             "user_name": st.session_state.user_name
         }
+        logger.info(f"Enviando mensagem pelo WebSocket: {message_data}")
         await st.session_state.websocket.send(json.dumps(message_data))
         response = await st.session_state.websocket.recv()
+        logger.info(f"Resposta recebida do WebSocket: {response}")
         return json.loads(response)
     except Exception as e:
+        logger.error(f"Erro ao enviar mensagem pelo WebSocket: {str(e)}")
         st.error(f"Error sending message: {str(e)}")
         st.session_state.is_connected = False
         return None

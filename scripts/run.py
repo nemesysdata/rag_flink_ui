@@ -1,39 +1,45 @@
 """
-Script to run both the frontend and backend services.
+Script to run the application.
 """
 
 import subprocess
 import sys
 import os
 from pathlib import Path
+from loguru import logger
 
-def run_services():
-    """Run both frontend and backend services."""
+def get_port() -> int:
+    """Get the port from environment variable or use default."""
+    return int(os.getenv("PORT", "8080"))
+
+def run_service():
+    """Run the application service."""
     # Get the project root directory
     project_root = Path(__file__).parent.parent
+    
+    # Get port from environment
+    port = get_port()
+
+    logger.info(f"Iniciando backend na porta {port}...")
+
+    # Caminho absoluto para o uvicorn dentro do virtualenv
+    uvicorn_path = str(project_root / ".venv" / "bin" / "uvicorn")
 
     # Start the backend
     backend_cmd = [
-        "uvicorn",
+        uvicorn_path,
         "rag_flink_ui.backend.main:app",
         "--host",
         "0.0.0.0",
         "--port",
-        "8000",
-        "--reload"
+        str(port),
+        "--reload" if os.getenv("ENVIRONMENT") == "development" else None
     ]
-
-    # Start the frontend
-    frontend_cmd = [
-        "streamlit",
-        "run",
-        str(project_root / "rag_flink_ui" / "frontend" / "app.py"),
-        "--server.port",
-        "8501"
-    ]
+    # Remove None values
+    backend_cmd = [cmd for cmd in backend_cmd if cmd is not None]
 
     try:
-        # Start backend in a separate process
+        # Start backend process
         backend_process = subprocess.Popen(
             backend_cmd,
             cwd=project_root,
@@ -41,27 +47,14 @@ def run_services():
             stderr=subprocess.PIPE
         )
 
-        # Start frontend in a separate process
-        frontend_process = subprocess.Popen(
-            frontend_cmd,
-            cwd=project_root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        logger.info(f"Service started successfully! Application running at: http://localhost:{port}")
 
-        print("Services started successfully!")
-        print("Backend running at: http://localhost:8000")
-        print("Frontend running at: http://localhost:8501")
-
-        # Wait for both processes
+        # Wait for process
         backend_process.wait()
-        frontend_process.wait()
 
-    except KeyboardInterrupt:
-        print("\nShutting down services...")
-        backend_process.terminate()
-        frontend_process.terminate()
-        sys.exit(0)
+    except Exception as e:
+        logger.exception(f"Erro ao iniciar o backend: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    run_services() 
+    run_service() 

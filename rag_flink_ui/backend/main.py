@@ -14,10 +14,21 @@ from typing import Dict, List
 import json
 from datetime import datetime
 from .mock_api import mock_service
+from .services.kafka_service import get_kafka_service
 import os
 import sys
 from pathlib import Path
 from loguru import logger
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Log critical environment variables (without exposing sensitive data)
+logger.info(f"KAFKA_BOOTSTRAP_SERVERS: {os.getenv('KAFKA_BOOTSTRAP_SERVERS')}")
+logger.info(f"SCHEMA_REGISTRY_URL: {os.getenv('SCHEMA_REGISTRY_URL')}")
+logger.info(f"KAFKA_USERNAME: {'set' if os.getenv('KAFKA_USERNAME') else 'not set'}")
+logger.info(f"SCHEMA_REGISTRY_USER: {'set' if os.getenv('SCHEMA_REGISTRY_USER') else 'not set'}")
 
 app = FastAPI(title="RAG Flink UI Backend")
 
@@ -66,6 +77,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
+            
+            # Produce message to Kafka
+            try:
+                kafka_service = get_kafka_service()
+                kafka_service.produce_question(session_id, message["content"])
+                logger.info(f"Question produced to Kafka for session {session_id}")
+            except Exception as e:
+                logger.error(f"Failed to produce message to Kafka: {str(e)}")
+                # Continue processing even if Kafka fails
+                # The mock service will still provide a response
             
             # Get response from mock service
             response = mock_service.get_response(message["content"])

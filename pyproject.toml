@@ -16,6 +16,15 @@ python-dotenv = "^1.0.1"
 pydantic = "^2.6.3"
 uuid = "^1.30"
 loguru = "^0.7.2"
+prometheus-client = "^0.19.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.9"
+cachetools = "^5.3.3"
+redis = "^5.0.1"
+aiokafka = "^0.8.1"
+confluent-kafka = "^2.3.0"
+avro-python3 = "^1.10.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.2"

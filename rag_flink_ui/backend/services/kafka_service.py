@@ -40,12 +40,17 @@ class KafkaService:
             'client.id': 'rag-flink-ui-producer'
         }
 
+        logger.info(f"Initializing Kafka service with config: {producer_conf}")
+        logger.info(f"Schema Registry config: {schema_registry_conf}")
+
         try:
             # Initialize Schema Registry client
             self.schema_registry_client = SchemaRegistryClient(schema_registry_conf)
+            logger.info("Schema Registry client initialized successfully")
             
             # Get the latest schema version
             schema_str = self.schema_registry_client.get_latest_version('perguntas-value').schema.schema_str
+            logger.info(f"Retrieved schema: {schema_str}")
             
             # Initialize Avro serializer
             self.avro_serializer = AvroSerializer(
@@ -53,13 +58,13 @@ class KafkaService:
                 schema_str,
                 lambda obj, ctx: obj
             )
+            logger.info("Avro serializer initialized successfully")
             
             # Initialize string serializer for keys
             self.string_serializer = StringSerializer('utf_8')
             
             # Initialize producer
             self.producer = Producer(producer_conf)
-            
             logger.info("Kafka producer initialized successfully")
             self._initialized = True
         except Exception as e:
@@ -80,10 +85,12 @@ class KafkaService:
                 'session_id': session_id,
                 'pergunta': pergunta
             }
+            logger.info(f"Preparing to produce message: {message_value}")
             
             # Serialize message
             serialized_value = self.avro_serializer(message_value, None)
             serialized_key = self.string_serializer(session_id, None)
+            logger.info("Message serialized successfully")
             
             # Produce message
             self.producer.produce(
@@ -92,9 +99,11 @@ class KafkaService:
                 value=serialized_value,
                 on_delivery=self._delivery_report
             )
+            logger.info("Message produced to Kafka")
             
             # Flush to ensure message is sent
             self.producer.flush()
+            logger.info("Producer flushed successfully")
             
             logger.info(f"Message produced successfully for session {session_id}")
         except Exception as e:
@@ -112,7 +121,7 @@ class KafkaService:
         if err is not None:
             logger.error(f"Message delivery failed: {err}")
         else:
-            logger.debug(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+            logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
 def get_kafka_service():
     """Get or create the Kafka service instance."""

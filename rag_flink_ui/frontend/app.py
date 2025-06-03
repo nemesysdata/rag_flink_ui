@@ -11,6 +11,15 @@ import os
 from typing import Dict, List, Optional
 import time
 from loguru import logger
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Get port from environment variable or use default
+PORT = int(os.getenv("PORT", 8501))
+
+logger.info("Iniciando Streamlit frontend do RAG Flink UI...")
 
 # Initialize session state
 if "session_id" not in st.session_state:
@@ -23,8 +32,6 @@ if "websocket" not in st.session_state:
     st.session_state.websocket = None
 if "is_connected" not in st.session_state:
     st.session_state.is_connected = False
-
-logger.info("Iniciando Streamlit frontend do RAG Flink UI...")
 
 def get_backend_url() -> str:
     """Get the backend URL from environment or use default."""
@@ -39,17 +46,17 @@ def get_backend_url() -> str:
 
 async def connect_websocket():
     """Connect to the WebSocket server."""
-    try:
-        uri = f"{get_backend_url()}/ws/{st.session_state.session_id}"
-        logger.info(f"Tentando conectar ao WebSocket: {uri}")
-        st.session_state.websocket = await websockets.connect(uri)
-        st.session_state.is_connected = True
-        logger.info("Conexão WebSocket estabelecida com sucesso.")
-        return True
-    except Exception as e:
-        logger.error(f"Falha ao conectar ao WebSocket: {str(e)}")
-        st.error(f"Failed to connect to WebSocket server: {str(e)}")
-        return False
+    if st.session_state.websocket is None:
+        try:
+            websocket_url = f"{get_backend_url()}/ws/{st.session_state.session_id}"
+            logger.info(f"Tentando conectar ao WebSocket: {websocket_url}")
+            st.session_state.websocket = await websockets.connect(websocket_url)
+            st.session_state.is_connected = True
+            logger.info("Conexão WebSocket estabelecida com sucesso.")
+        except Exception as e:
+            logger.error(f"Erro ao conectar ao WebSocket: {str(e)}")
+            st.error("Erro ao conectar ao servidor. Por favor, tente novamente.")
+            st.session_state.websocket = None
 
 async def send_message(message: str):
     """Send a message through the WebSocket connection."""

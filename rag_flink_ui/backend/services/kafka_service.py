@@ -27,16 +27,16 @@ class KafkaService:
         # Schema Registry configuration
         schema_registry_conf = {
             'url': os.getenv('SCHEMA_REGISTRY_URL'),
-            'basic.auth.user.info': f"{os.getenv('SCHEMA_REGISTRY_USER')}:{os.getenv('SCHEMA_REGISTRY_PASSWORD')}"
+            'basic.auth.user.info': f"{os.getenv('SCHEMA_REGISTRY_API_KEY')}:{os.getenv('SCHEMA_REGISTRY_API_SECRET')}"
         }
         
         # Kafka producer configuration
         producer_conf = {
             'bootstrap.servers': os.getenv('KAFKA_BOOTSTRAP_SERVERS'),
-            'security.protocol': 'SASL_SSL',
-            'sasl.mechanisms': 'PLAIN',
-            'sasl.username': os.getenv('KAFKA_USERNAME'),
-            'sasl.password': os.getenv('KAFKA_PASSWORD'),
+            'security.protocol': os.getenv('KAFKA_SECURITY_PROTOCOL'),
+            'sasl.mechanisms': os.getenv('KAFKA_SASL_MECHANISM'),
+            'sasl.username': os.getenv('KAFKA_API_KEY'),
+            'sasl.password': os.getenv('KAFKA_API_SECRET'),
             'client.id': 'rag-flink-ui-producer'
         }
 

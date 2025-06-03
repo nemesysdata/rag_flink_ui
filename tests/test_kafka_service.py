@@ -11,11 +11,13 @@ load_dotenv()
 
 # Mock environment variables for testing
 os.environ['KAFKA_BOOTSTRAP_SERVERS'] = 'test-broker:9092'
-os.environ['KAFKA_USERNAME'] = 'test-user'
-os.environ['KAFKA_PASSWORD'] = 'test-password'
+os.environ['KAFKA_API_KEY'] = 'test-user'
+os.environ['KAFKA_API_SECRET'] = 'test-password'
+os.environ['KAFKA_SECURITY_PROTOCOL'] = 'SASL_SSL'
+os.environ['KAFKA_SASL_MECHANISM'] = 'PLAIN'
 os.environ['SCHEMA_REGISTRY_URL'] = 'http://test-registry:8081'
-os.environ['SCHEMA_REGISTRY_USER'] = 'test-user'
-os.environ['SCHEMA_REGISTRY_PASSWORD'] = 'test-password'
+os.environ['SCHEMA_REGISTRY_API_KEY'] = 'test-user'
+os.environ['SCHEMA_REGISTRY_API_SECRET'] = 'test-password'
 
 @pytest.fixture(autouse=True)
 def mock_kafka_dependencies(monkeypatch):

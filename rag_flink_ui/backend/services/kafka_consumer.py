@@ -9,6 +9,8 @@ from confluent_kafka import Consumer, KafkaError
 from confluent_kafka.avro import AvroConsumer
 from confluent_kafka.avro.serializer import SerializerError
 from .websocket_manager import WebSocketSessionManager
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,7 @@ class KafkaResponseConsumer:
         websocket_manager: WebSocketSessionManager,
         bootstrap_servers: str,
         schema_registry_url: str,
-        group_id: str = "rag-flink-ui-group"
+        group_id: str = os.getenv('KAFKA_CONSUMER_GROUP', 'pdf-processor-group')
     ):
         """
         Initialize the Kafka consumer.
@@ -41,14 +43,22 @@ class KafkaResponseConsumer:
         self.websocket_manager = websocket_manager
         self.consumer = None
         self.running = False
+        self.executor = ThreadPoolExecutor(max_workers=1)
         
         # Kafka consumer configuration
         self.config = {
             'bootstrap.servers': bootstrap_servers,
             'group.id': group_id,
-            'auto.offset.reset': 'latest',
-            'schema.registry.url': schema_registry_url
+            'auto.offset.reset': os.getenv('KAFKA_AUTO_OFFSET_RESET', 'latest'),
+            'schema.registry.url': schema_registry_url,
+            'security.protocol': os.getenv('KAFKA_SECURITY_PROTOCOL'),
+            'sasl.mechanisms': os.getenv('KAFKA_SASL_MECHANISM'),
+            'sasl.username': os.getenv('KAFKA_API_KEY'),
+            'sasl.password': os.getenv('KAFKA_API_SECRET'),
+            'client.id': 'rag-flink-ui-consumer'
         }
+        
+        logger.info(f"Initializing Kafka consumer with config: {self.config}")
     
     async def start(self) -> None:
         """Start consuming messages from Kafka."""
@@ -69,14 +79,19 @@ class KafkaResponseConsumer:
         self.running = False
         if self.consumer:
             self.consumer.close()
-            logger.info("Kafka consumer stopped")
+        if self.executor:
+            self.executor.shutdown(wait=True)
+        logger.info("Kafka consumer stopped")
     
     async def _consume_messages(self) -> None:
         """Consume and process messages from Kafka."""
         while self.running:
             try:
-                # Poll for messages
-                message = self.consumer.poll(1.0)
+                # Run poll in a thread to avoid blocking the event loop
+                message = await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    lambda: self.consumer.poll(1.0)
+                )
                 
                 if message is None:
                     continue

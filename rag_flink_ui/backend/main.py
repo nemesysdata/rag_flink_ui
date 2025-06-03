@@ -6,9 +6,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import streamlit as st
-import streamlit.web.bootstrap
-import streamlit.web.server.server
+from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from typing import Dict, List
 import json
@@ -24,13 +22,26 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Get port from environment variable or use default
+PORT = int(os.getenv("PORT", 8080))
+
 # Log critical environment variables (without exposing sensitive data)
 logger.info(f"KAFKA_BOOTSTRAP_SERVERS: {os.getenv('KAFKA_BOOTSTRAP_SERVERS')}")
 logger.info(f"SCHEMA_REGISTRY_URL: {os.getenv('SCHEMA_REGISTRY_URL')}")
-logger.info(f"KAFKA_USERNAME: {'set' if os.getenv('KAFKA_USERNAME') else 'not set'}")
-logger.info(f"SCHEMA_REGISTRY_USER: {'set' if os.getenv('SCHEMA_REGISTRY_USER') else 'not set'}")
+logger.info(f"KAFKA_API_KEY: {'set' if os.getenv('KAFKA_API_KEY') else 'not set'}")
+logger.info(f"SCHEMA_REGISTRY_API_KEY: {'set' if os.getenv('SCHEMA_REGISTRY_API_KEY') else 'not set'}")
+logger.info(f"Using port: {PORT}")
 
 app = FastAPI(title="RAG Flink UI Backend")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Store active connections
 class ConnectionManager:
@@ -51,22 +62,9 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Initialize Streamlit
-def init_streamlit():
-    """Initialize Streamlit in the background."""
-    sys.argv = ["streamlit", "run", str(Path(__file__).parent.parent / "frontend" / "app.py")]
-    streamlit.web.bootstrap.run(
-        str(Path(__file__).parent.parent / "frontend" / "app.py"),
-        "",
-        [],
-        flag_options={},
-    )
-
 @app.on_event("startup")
 async def startup_event():
-    """Start Streamlit in the background on startup."""
-    logger.info("FastAPI startup event: inicializando Streamlit em background...")
-    asyncio.create_task(asyncio.to_thread(init_streamlit))
+    """Initialize services on startup."""
     logger.info("FastAPI está ouvindo e pronto para receber requisições.")
 
 @app.websocket("/ws/{session_id}")
@@ -104,6 +102,10 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "message": "Service healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
 
 # Mount Streamlit's static files
 # app.mount("/static", StaticFiles(directory=str(Path(__file__).parent.parent / "frontend" / "static")), name="static") 

@@ -85,4 +85,4 @@ async def health_check():
     return {"status": "ok", "message": "Service healthy"}
 
 # Mount Streamlit's static files
-app.mount("/static", StaticFiles(directory=str(Path(__file__).parent.parent / "frontend" / "static")), name="static") 
+# app.mount("/static", StaticFiles(directory=str(Path(__file__).parent.parent / "frontend" / "static")), name="static") 

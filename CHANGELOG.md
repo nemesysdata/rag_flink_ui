@@ -8,23 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- List new features here
+- Kafka consumer service for processing RAG responses
+- WebSocket session manager for handling client connections
+- Thread-safe session state management
+- One question at a time processing
+- Comprehensive error handling and recovery
+- Detailed logging and monitoring
+- Unit tests for new components
 
 ### Changed
-- List changes in existing functionality here
-
-### Deprecated
-- List soon-to-be removed features here
-
-### Removed
-- List removed features here
+- Replaced simple connection manager with WebSocket session manager
+- Updated WebSocket endpoint to handle session state
+- Improved error handling and user feedback
+- Enhanced logging for better debugging
 
 ### Fixed
-- List any bug fixes here
+- Race conditions in WebSocket message handling
+- Resource leaks in connection management
+- Error handling in Kafka message processing
 
-### Security
-- List security fixes here
+## [0.1.0] - 2024-03-19
 
-## [0.1.0] - YYYY-MM-DD
 ### Added
-- Initial release 
+- Initial project setup
+- FastAPI backend with WebSocket support
+- Streamlit frontend
+- Kafka integration for question processing
+- Basic error handling
+- Health check endpoints
+- CORS middleware
+- Environment variable configuration
+- Docker support
+- CI/CD pipeline 

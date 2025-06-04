@@ -95,6 +95,8 @@ class WebSocketState:
                         "processing_time": response_data.get("processing_time")
                     })
                     logger.info("[UI] Interface atualizada com a resposta")
+                    st.session_state.waiting_for_response = False
+
                     
                     # Request UI update
                     if runtime.is_active_session(ctx.session_id):
@@ -137,6 +139,8 @@ class WebSocketState:
         logger.info("[FILA] Mensagem enfileirada com sucesso")
         self.messages.append({"role": "user", "content": message})
         logger.info("[UI] Mensagem do usuário adicionada ao histórico")
+        # Store the time when we sent the message
+        st.session_state.last_message_time = time.time()
 
 # Initialize session state
 if "ws_state" not in st.session_state:
@@ -160,7 +164,7 @@ def initialize_chat() -> None:
         if st.session_state.ws_state.is_connected:
             st.success("Connected to server")
         else:
-            st.warning("Not connected to server")
+            st.error("Not connected to server. Please refresh the page.")
 
 def display_messages() -> None:
     """Display chat messages."""
@@ -196,15 +200,35 @@ def main() -> None:
     if st.session_state.ws_state.user_name:
         display_messages()
         
+        # Initialize waiting state if not exists
+        if "waiting_for_response" not in st.session_state:
+            st.session_state.waiting_for_response = False
+        
         # Chat input
-        if prompt := st.chat_input("What would you like to know?"):
+        if not st.session_state.waiting_for_response and (prompt := st.chat_input("What would you like to know?")):
+            # Check if we're connected
+            if not st.session_state.ws_state.is_connected:
+                st.error("Not connected to server. Please refresh the page.")
+                return
+                
             # Display user message
             with st.chat_message("user"):
                 st.write(prompt)
             
-            # Send message
+            # Send message and show spinner immediately
             st.session_state.ws_state.send_message(prompt)
-            st.rerun()
+            st.session_state.waiting_for_response = True
+            
+        if st.session_state.waiting_for_response:
+            with st.chat_message("assistant"):
+                st.write("Thinking...")
+            
+        # Check for timeout
+        if st.session_state.waiting_for_response:
+            if time.time() - st.session_state.get("last_message_time", time.time()) > 30:
+                st.error("The server is taking too long to respond. Please check if the backend is running and try again.")
+                st.session_state.waiting_for_response = False
+                st.session_state.ws_state.is_connected = False
 
 if __name__ == "__main__":
     main() 

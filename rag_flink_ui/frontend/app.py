@@ -14,6 +14,9 @@ from loguru import logger
 from dotenv import load_dotenv
 from queue import Queue, Empty
 import threading
+from streamlit.runtime import get_instance
+from streamlit.runtime.scriptrunner import add_script_run_ctx
+from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +53,10 @@ class WebSocketState:
     
     async def _websocket_handler(self):
         """Handle WebSocket connection and message processing."""
+        ctx = get_script_run_ctx()
+        assert ctx, "Context must be set with `add_script_run_ctx`."
+        runtime = get_instance()
+        
         while True:
             try:
                 if self.websocket is None:
@@ -88,7 +95,12 @@ class WebSocketState:
                         "processing_time": response_data.get("processing_time")
                     })
                     logger.info("[UI] Interface atualizada com a resposta")
-                    st.rerun()
+                    
+                    # Request UI update
+                    if runtime.is_active_session(ctx.session_id):
+                        session_info = runtime._session_mgr.get_active_session_info(ctx.session_id)
+                        if session_info:
+                            session_info.session.request_rerun(None)
                     
                 except Empty:
                     # No messages in queue, continue waiting
@@ -115,6 +127,7 @@ class WebSocketState:
                 self.loop.run_forever()
             
             thread = threading.Thread(target=run_loop, daemon=True)
+            add_script_run_ctx(thread)  # Add Streamlit context to the thread
             thread.start()
     
     def send_message(self, message: str):
@@ -152,12 +165,22 @@ def initialize_chat() -> None:
 def display_messages() -> None:
     """Display chat messages."""
     for message in st.session_state.ws_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-            if "confidence" in message:
-                st.caption(f"Confidence: {message['confidence']:.2%}")
-            if "processing_time" in message:
-                st.caption(f"Processing time: {message['processing_time']:.2f}s")
+        if message["role"] == "user":
+            with st.chat_message("user"):
+                st.write(message["content"])
+        else:  # assistant
+            with st.chat_message("assistant"):
+                # Create a generator function for the message content
+                def message_generator():
+                    for char in message["content"]:
+                        yield char
+                        time.sleep(0.02)  # Ajustar velocidade conforme necessário
+                
+                st.write_stream(message_generator)
+                if message.get("confidence") is not None:
+                    st.caption(f"Confidence: {message['confidence']:.2%}")
+                if message.get("processing_time") is not None:
+                    st.caption(f"Processing time: {message['processing_time']:.2f}s")
 
 def main() -> None:
     """Main application entry point."""
@@ -174,6 +197,7 @@ def main() -> None:
             
             # Send message
             st.session_state.ws_state.send_message(prompt)
+            st.rerun()
 
 if __name__ == "__main__":
     main() 

@@ -170,13 +170,20 @@ def display_messages() -> None:
                 st.write(message["content"])
         else:  # assistant
             with st.chat_message("assistant"):
-                # Create a generator function for the message content
-                def message_generator():
-                    for char in message["content"]:
-                        yield char
-                        time.sleep(0.02)  # Ajustar velocidade conforme necessário
+                # Check if this is the first time displaying this message
+                if not message.get("displayed", False):
+                    # Create a generator function for the message content
+                    def message_generator():
+                        for char in message["content"]:
+                            yield char
+                            time.sleep(0.02)  # Ajustar velocidade conforme necessário
+                    
+                    st.write_stream(message_generator)
+                    message["displayed"] = True  # Mark message as displayed
+                else:
+                    # For subsequent displays, just show the content directly
+                    st.write(message["content"])
                 
-                st.write_stream(message_generator)
                 if message.get("confidence") is not None:
                     st.caption(f"Confidence: {message['confidence']:.2%}")
                 if message.get("processing_time") is not None:

@@ -28,6 +28,7 @@ avro-python3 = "^1.10.2"
 httpx = "^0.27.0"
 authlib = "^1.2.1"
 fastavro = "^1.9.0"
+watchdog = "^6.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.2"
